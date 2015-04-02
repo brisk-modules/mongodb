@@ -3,9 +3,9 @@ var mongoose = require('mongoose'),
 	ObjectId = Schema.ObjectId,
 	//Model = require("brisk").getClass("main");
 	brisk = require("brisk"),
-	Model = brisk.getBaseModel("model");
+	Parent = brisk.getBaseModel("model");
 
-var model = Model.extend({
+var model = Parent.extend({
 
 	options: {
 		archive: false, // set to true to enable soft-delete
@@ -22,9 +22,10 @@ var model = Model.extend({
 
 		// prerequisite
 		if( !this.backend ) return;
-		var Model = new Schema( this.schema() );
+		// setup monogo model
+		var schema = this.normalSchema();
 		// create the model
-		this.db = this.db || site.modules.db.model(this.backend, Model);
+		this.db = this.db || site.modules.db.model(this.backend, schema);
 
 	},
 
@@ -52,6 +53,9 @@ var model = Model.extend({
 			data[this.options.timestamps.updated] = now();
 		}
 		var attributes = this.attributes( data );
+
+		//var db = new this.db( data });
+		//db.save( callback );
 
 		this.db.call("PutAttributes", attributes, function( err, result ){
 			if (err) return callback(err);
@@ -243,6 +247,48 @@ var model = Model.extend({
 			callback( null, { success: true });
 		});
 
+	},
+
+	// normalize "flat" schema to mongo schema
+	normalSchema: function(){
+		// get regular schema
+		var schema =  this.schema();
+		// loop through attributes
+		for( var i in schema ){
+			if( schema[i] == null ){
+				// convention
+				schema[i] = { type: String, default: schema[i] };
+			} else if( schema[i].type ){
+				// if type defined always use that...
+				continue;
+			} else if( i == "_id" ){
+				// id
+				schema[i] = { type: Schema.Types.Objectid, default: schema[i] };
+			} else if( i == "date" ){
+				// date
+				schema[i] = { type: Date, default: schema[i] };
+			} else if( i == "email" ){
+				// email
+				schema[i] = {type: String, match: /[\w]+@[\w]+\.[\w]{2,3}/, default: schema[i] };
+			} else if( schema[i] instanceof Array ){
+				// array
+				schema[i] = { type: Array, default: schema[i] };
+			} else if( schema[i] === true || schema[i] === false ){
+				// boolean
+				schema[i] = { type: Boolean, default: schema[i] };
+			} else if( schema[i] !== "" && !isNaN( schema[i] ) ){
+				// number
+				schema[i] = { type: Number, default: schema[i] };
+			} else if( typeof schema[i] == "string" ){
+				// everything else is a string?
+				schema[i] = { type: String, default: schema[i] };
+			} else {
+				// everything else is an object?
+				schema[i] = { type: Schema.Types.Mixed, default: schema[i] };
+			}
+		}
+		// aslo available, but not yet supported: Buffer,
+		return schema;
 	}
 
 });
@@ -253,6 +299,7 @@ function now(){
 	// make sure this is calculates miliseconds? (13 chars)
 	return (new Date()).getTime();
 }
+
 
 
 module.exports = model;
