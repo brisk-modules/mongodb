@@ -32,6 +32,6 @@
 	},
 	"dependencies": {
 		"brisk": "x",
-		"mongoose": "3.6.13"
+		"mongoose": "4.0.1"
 	}
 }
